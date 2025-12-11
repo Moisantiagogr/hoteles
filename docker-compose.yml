@@ -1,0 +1,47 @@
+services:
+  database:
+    image: mysql:8
+    container_name: db-hotel
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: hotel
+    ports:
+      - "3307:3306"
+    networks:
+      - hotel-net
+    volumes:
+      - hotel-data:/var/lib/mysql
+
+  frontend:
+    image: client:hotel-v1
+    container_name: frontend-hotel
+    build:
+      context: ./Hoteles-front
+    ports:
+      - "80:80"
+    networks:
+      - hotel-net
+
+  backend:
+    image: services:hotel-v1
+    container_name: backend-hotel
+    build:
+      context: ./hotel-back
+    environment:
+      SERVER_PORT: 8080
+      DB_URL: jdbc:mysql://database:3306/hotel
+      DB_USER: root
+      DB_PASSWORD: root
+      JWT_SECRET: H0T3LB4CK3NDS3CR37K3Y
+    ports:
+      - "8082:8080"
+    networks:
+      - hotel-net
+    
+networks:
+  hotel-net:
+    external: true
+  
+volumes:
+  hotel-data:
+    external: true
