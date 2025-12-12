@@ -1,48 +1,62 @@
 pipeline {
     agent any
 
+    // Aseguramos que el PATH incluya los binarios necesarios (como en tu ejemplo)
+    environment {
+        PATH = "/usr/bin:${env.PATH}"
+    }
+
     stages {
-        // 1. Parar los servicios existentes (si los hay)
-        stage('Parando los servicios...') {
+        // 1. Parar servicios (Cambiado 'gmu' por 'hoteles')
+        stage('Stopping services') {
             steps {
-                // El "|| true" asegura que el pipeline no falle si no hay nada corriendo
-                sh 'docker compose -p hoteles down || true'
+                sh '''
+                    docker compose -p hoteles down || true
+                '''
             }
         }
 
-        // 2. Eliminar las imágenes antiguas
-        stage('Eliminando imágenes anteriores...') {
-            steps {
-                // Lógica en Bash (Linux) para limpiar imágenes
+        // 2. Limpiar imágenes (Cambiado filtro a 'hoteles')
+        stage('Deleting old images') {
+            steps{
                 sh '''
-                    IMG_IDS=$(docker images --filter "label=com.docker.compose.project=hoteles" -q)
-                    
-                    if [ -z "$IMG_IDS" ]; then
-                        echo "No hay imagenes por eliminar"
-                    else
-                        docker rmi -f $IMG_IDS
-                        echo "Imagenes eliminadas correctamente"
+                    IMAGES=$(docker images --filter "label=com.docker.compose.project=hoteles" -q)
+                    if [ -n "$IMAGES" ]; then
+                        docker rmi -f $IMAGES
                     fi
                 '''
             }
         }
 
-        // 3. Descargar el código del repositorio
-        stage('Obteniendo actualización...') {
+        // 3. Descargar código
+        stage('Pulling update') {
             steps {
                 checkout scm
             }
         }
 
-        // 4. Construir y levantar los servicios
-        stage('Construyendo y desplegando servicios...') {
+        // 4. Construir imágenes (Igual que el ejemplo, pero aplica a tu docker-compose)
+        stage('Building new images') {
             steps {
                 sh '''
-                    echo "Creando red 'hotel-net' si no existe..."
-                    docker network create hotel-net || true
+                    docker compose build --no-cache
+                '''
+            }
+        }
 
-                    echo "Construyendo y levantando contenedores..."
-                    docker compose up --build -d
+        // 5. Desplegar (AQUÍ AGREGUÉ LA SOLUCIÓN A TUS ERRORES ANTERIORES)
+        stage('Deploying containers') {
+            steps {
+                sh '''
+                    echo "Checking network and volumes..."
+                    # Creamos la red 'hotel-net' si no existe (solución a tu error de red)
+                    docker network create hotel-net || true
+                    
+                    # Creamos el volumen 'hotel-data' si no existe (solución a tu error de volumen)
+                    docker volume create hotel-data || true
+
+                    # Levantamos los servicios
+                    docker compose up -d
                 '''
             }
         }
@@ -50,15 +64,11 @@ pipeline {
 
     post {
         success {
-            echo 'Pipeline ejecutado con éxito'
+            echo 'Pipeline executed successfully.'
         }
 
         failure {
-            echo 'Hubo un error al ejecutar el pipeline'
-        }
-
-        always {
-            echo 'Pipeline finalizado'
+            echo 'An error occurred during pipeline execution, check the logs.'
         }
     }
 }
