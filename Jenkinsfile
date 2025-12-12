@@ -2,27 +2,24 @@ pipeline {
     agent any
 
     stages {
-        // 1. Parar servicios
+        // 1. Parar los servicios existentes (si los hay)
         stage('Parando los servicios...') {
             steps {
-                // CORREGIDO: 'exit /b 0' es de Windows. En Linux usamos 'true' para no fallar.
+                // El "|| true" asegura que el pipeline no falle si no hay nada corriendo
                 sh 'docker compose -p hoteles down || true'
             }
         }
 
-        // 2. Eliminar imágenes
+        // 2. Eliminar las imágenes antiguas
         stage('Eliminando imágenes anteriores...') {
             steps {
-                // CORREGIDO: Lógica traducida de Batch (Windows) a Bash (Linux)
+                // Lógica en Bash (Linux) para limpiar imágenes
                 sh '''
-                    # Guardamos los IDs de las imagenes en una variable
                     IMG_IDS=$(docker images --filter "label=com.docker.compose.project=hoteles" -q)
                     
-                    # Verificamos si la variable esta vacia
                     if [ -z "$IMG_IDS" ]; then
                         echo "No hay imagenes por eliminar"
                     else
-                        # Si hay imagenes, las borramos
                         docker rmi -f $IMG_IDS
                         echo "Imagenes eliminadas correctamente"
                     fi
@@ -30,17 +27,23 @@ pipeline {
             }
         }
 
-        // 3. Obtener código
+        // 3. Descargar el código del repositorio
         stage('Obteniendo actualización...') {
             steps {
                 checkout scm
             }
         }
 
-        // 4. Construir y levantar
+        // 4. Construir y levantar los servicios
         stage('Construyendo y desplegando servicios...') {
             steps {
-                sh 'docker compose up --build -d'
+                sh '''
+                    echo "Creando red 'hotel-net' si no existe..."
+                    docker network create hotel-net || true
+
+                    echo "Construyendo y levantando contenedores..."
+                    docker compose up --build -d
+                '''
             }
         }
     }
@@ -49,9 +52,11 @@ pipeline {
         success {
             echo 'Pipeline ejecutado con éxito'
         }
+
         failure {
             echo 'Hubo un error al ejecutar el pipeline'
         }
+
         always {
             echo 'Pipeline finalizado'
         }
