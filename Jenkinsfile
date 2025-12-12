@@ -5,8 +5,8 @@ pipeline {
         // Parar los servicios que ya existen o en todo caso hacer caso omiso
         stage('Parando los servicios...') {
             steps {
-                bat '''
-                    docker compose -p hotel-back down || exit /b 0
+                sh '''
+                    docker compose -p hoteles down || exit /b 0
                 '''
             }
         }
@@ -14,8 +14,8 @@ pipeline {
         // Eliminar las imágenes creadas por ese proyecto
         stage('Eliminando imágenes anteriores...') {
             steps {
-                bat '''
-                    for /f "tokens=*" %%i in ('docker images --filter "label=com.docker.compose.project=hotel-back" -q') do (
+                sh '''
+                    for /f "tokens=*" %%i in ('docker images --filter "label=com.docker.compose.project=hoteles" -q') do (
                         docker rmi -f %%i
                     )
                     if errorlevel 1 (
@@ -37,7 +37,7 @@ pipeline {
         // Construir y levantar los servicios
         stage('Construyendo y desplegando servicios...') {
             steps {
-                bat '''
+                sh '''
                     docker compose up --build -d
                 '''
             }
