@@ -2,44 +2,45 @@ pipeline {
     agent any
 
     stages {
-        // Parar los servicios que ya existen o en todo caso hacer caso omiso
+        // 1. Parar servicios
         stage('Parando los servicios...') {
             steps {
-                sh '''
-                    docker compose -p hoteles down || exit /b 0
-                '''
+                // CORREGIDO: 'exit /b 0' es de Windows. En Linux usamos 'true' para no fallar.
+                sh 'docker compose -p hoteles down || true'
             }
         }
 
-        // Eliminar las imágenes creadas por ese proyecto
+        // 2. Eliminar imágenes
         stage('Eliminando imágenes anteriores...') {
             steps {
+                // CORREGIDO: Lógica traducida de Batch (Windows) a Bash (Linux)
                 sh '''
-                    for /f "tokens=*" %%i in ('docker images --filter "label=com.docker.compose.project=hoteles" -q') do (
-                        docker rmi -f %%i
-                    )
-                    if errorlevel 1 (
-                        echo No hay imagenes por eliminar
-                    ) else (
-                        echo Imagenes eliminadas correctamente
-                    )
+                    # Guardamos los IDs de las imagenes en una variable
+                    IMG_IDS=$(docker images --filter "label=com.docker.compose.project=hoteles" -q)
+                    
+                    # Verificamos si la variable esta vacia
+                    if [ -z "$IMG_IDS" ]; then
+                        echo "No hay imagenes por eliminar"
+                    else
+                        # Si hay imagenes, las borramos
+                        docker rmi -f $IMG_IDS
+                        echo "Imagenes eliminadas correctamente"
+                    fi
                 '''
             }
         }
 
-        // Del recurso SCM configurado en el job, jala el repo
+        // 3. Obtener código
         stage('Obteniendo actualización...') {
             steps {
                 checkout scm
             }
         }
 
-        // Construir y levantar los servicios
+        // 4. Construir y levantar
         stage('Construyendo y desplegando servicios...') {
             steps {
-                sh '''
-                    docker compose up --build -d
-                '''
+                sh 'docker compose up --build -d'
             }
         }
     }
@@ -48,14 +49,11 @@ pipeline {
         success {
             echo 'Pipeline ejecutado con éxito'
         }
-
         failure {
             echo 'Hubo un error al ejecutar el pipeline'
         }
-
         always {
             echo 'Pipeline finalizado'
         }
     }
 }
-
